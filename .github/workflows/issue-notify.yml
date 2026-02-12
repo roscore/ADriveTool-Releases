@@ -1,0 +1,35 @@
+name: Issue → HIMARI
+
+on:
+  issues:
+    types: [opened, reopened]
+
+jobs:
+  notify:
+    runs-on: [self-hosted, himari]
+    timeout-minutes: 1
+    steps:
+      - name: Notify OpenClaw
+        env:
+          HOOK_TOKEN: ${{ secrets.OPENCLAW_HOOK_TOKEN }}
+        run: |
+          TITLE="${{ github.event.issue.title }}"
+          NUMBER="${{ github.event.issue.number }}"
+          AUTHOR="${{ github.event.issue.user.login }}"
+          URL="${{ github.event.issue.html_url }}"
+          BODY=$(echo '${{ toJSON(github.event.issue.body) }}' | head -c 1000)
+
+          MESSAGE="[ADriveTool-Releases] 새 이슈 #${NUMBER}: ${TITLE}
+          작성자: ${AUTHOR}
+          URL: ${URL}
+          내용: ${BODY}
+
+          이슈를 분석하고, 필요하면 roscore/ADriveTool private 레포에서 수정 작업 후 선생님(텔레그램 5640466668)에게 보고해줘. 간단한 질문이면 이슈에 직접 답변도 달아줘."
+
+          curl -sf -X POST http://127.0.0.1:18789/hooks/agent \
+            -H "Authorization: Bearer ${HOOK_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg msg "$MESSAGE" \
+              --arg key "hook:adrivetool-issue-${NUMBER}" \
+              '{message: $msg, name: "ADriveTool", sessionKey: $key, deliver: true, channel: "telegram", to: "5640466668"}')"
